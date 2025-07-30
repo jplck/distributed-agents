@@ -2,14 +2,22 @@ from typing import Any
 import asyncio
 import json
 import os
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
 from langchain.chat_models import init_chat_model
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
+from typing import Any
+from uuid import UUID
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import AIMessage
+from langchain_core.outputs.llm_result import LLMResult
 
 load_dotenv()
+
+class CallbackHandler(BaseCallbackHandler):
+    def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
+        print(f"LLM response: {response.generations[0][0].text}")
+        return
 
 api_key = os.environ.get("AZURE_OPENAI_API_KEY")
 if api_key:
@@ -45,11 +53,8 @@ async def main():
     tools = await mcp_client.get_tools()
     print(f"Available tools: {tools}")
 
-    
-    agent = create_react_agent(
-        model=llm,
-        tools=tools,
-    )
+    from react import CustomReactAgent
+    agent = CustomReactAgent(tools, llm)
 
     system_prompt = """
     Your job is to orchestrate multiple agents to complete tasks. Create a plan what to call and when. 
@@ -58,10 +63,16 @@ async def main():
     If you need to call an agent, use the `execute_agent` tool with the agent ID and the content you want to send.
     """
 
-    inputs = {"messages": [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": "Write a short story about a robot learning to dance."}]}
-    response = await agent.ainvoke(inputs)
+    inputs = [
+        SystemMessage(
+            content=system_prompt
+        ),
+        HumanMessage(
+            content="Write a short story about a robot learning to dance."
+        )
+    ]
+    
+    response = await agent.ainvoke(inputs, callbacks=[CallbackHandler()])
     print("Agent response:", response)
 
 if __name__ == "__main__":
