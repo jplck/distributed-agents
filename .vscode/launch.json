@@ -5,7 +5,7 @@
             "name": "Agent Server",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/agents/agents.py",
+            "program": "${workspaceFolder}/src/agents.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
@@ -16,7 +16,7 @@
             "name": "MCP Server",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/mcp.py",
+            "program": "${workspaceFolder}/src/mcp_agents.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
@@ -27,7 +27,7 @@
             "name": "Client",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/app.py",
+            "program": "${workspaceFolder}/src/client.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
