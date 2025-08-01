@@ -1,33 +1,51 @@
 from fastmcp import FastMCP
 import requests
 import json
+from dataclasses import dataclass
 
 mcp = FastMCP("MCP_Agents")
+agents = []
 
-cards = [
-    {
-        "id": "writer_agent",
-        "name": "Writer Agent",
-        "description": "An agent that helps with writing tasks.",
-        "url": "http://localhost:8000/writer_agent"
-    },
-    {
-        "id": "editor_agent",
-        "name": "Editor Agent",
-        "description": "An agent that reviews and edits text, provided by a writer agent.",
-        "url": "http://localhost:8000/editor_agent"
-    }
-]
+@dataclass
+class Agent:
+    method: str
+    id: str
+    description: str
+    summary: str
+    url: str
 
 @mcp.tool()
-def list_agents() -> list[dict]:
+def list_agents() -> list[Agent]:
     """
     Returns a list of available agents with their details.
     """
-    return cards
+    if agents:
+        return agents
+    
+    agent_api_url = "http://localhost:8005/openapi.json"
+    response = requests.get(agent_api_url)
+    if response.status_code == 200:
+        api_spec = response.json()
+        paths = api_spec.get("paths", {})
+        for path in paths:
+            for method, details in paths[path].items():
+                print(f"Method: {method.upper()}, Path: {path}")
+                agent = Agent(
+                    method=method.upper(),
+                    id=details.get("operationId", "unknown"),
+                    description=details.get("description", "No description available"),
+                    summary=details.get("summary", "No summary available"),
+                    url=f"http://localhost:8005{path}"
+                )
+                agents.append(agent)
+        return agents
+    else:
+        print(f"Error fetching API spec: {response.status_code}")
+
+    return {}
 
 @mcp.tool()
-def execute_agent(id: str, content: str) -> str:
+def execute_agent(agent_id: str, content: str = None) -> str:
     """
     Executes the specified agent.
 
@@ -36,26 +54,34 @@ def execute_agent(id: str, content: str) -> str:
         content (str): The content to send to the agent.
 
     """
-    for card in cards:
-        if card["id"] == id:
-            url = card["url"]
-            
-            # Create a simple payload with the content
-            payload = {"content": content}
-            
-            # Make the REST call
-            try:
-                response = requests.post(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(payload)
-                )
-                response.raise_for_status()
+    for agent in agents:
+        if agent.id == agent_id:
+            if agent.method == "POST":
+                # Prepare the request payload
+                payload = {"content": content}
                 
-                return response.text
-            except requests.exceptions.RequestException as e:
-                return f"Error executing agent: {str(e)}"
-            
+                # Make the REST call
+                try:
+                    response = requests.post(
+                        agent.url,
+                        headers={"Content-Type": "application/json"},
+                        data=json.dumps(payload)
+                    )
+                    response.raise_for_status()
+                    
+                    return response.text
+                except requests.exceptions.RequestException as e:
+                    return f"Error executing agent: {str(e)}"
+            elif agent.method == "GET":
+                # Make the REST call
+                try:
+                    response = requests.get(agent.url)
+                    response.raise_for_status()
+                    
+                    return response.text
+                except requests.exceptions.RequestException as e:
+                    return f"Error executing agent: {str(e)}"
+
     return "Agent not found"
 
 if __name__ == "__main__":
