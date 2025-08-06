@@ -28,7 +28,8 @@ if api_key:
         model_provider="azure_openai", 
         api_key=api_key, 
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), 
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        streaming=True,
     )
     
 else:
@@ -38,7 +39,8 @@ else:
         model_provider="openai", 
         temperature=0.7, 
         api_key=os.getenv("GITHUB_TOKEN"), 
-        base_url="https://models.inference.ai.azure.com"
+        base_url="https://models.inference.ai.azure.com",
+        streaming=True,
     )
 
 async def main():

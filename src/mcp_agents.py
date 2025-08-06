@@ -65,11 +65,20 @@ def execute_agent(agent_id: str, content: str = None) -> str:
                     response = requests.post(
                         agent.url,
                         headers={"Content-Type": "application/json"},
-                        data=json.dumps(payload)
+                        data=json.dumps(payload),
+                        stream=True
                     )
                     response.raise_for_status()
                     
-                    return response.text
+                    # Stream the response
+                    result = ""
+                    for chunk in response.iter_content(chunk_size=1024, decode_unicode=True):
+                        if chunk:
+                            result += chunk
+                            print(chunk, end="")
+                    
+                    return result
+                
                 except requests.exceptions.RequestException as e:
                     return f"Error executing agent: {str(e)}"
             elif agent.method == "GET":

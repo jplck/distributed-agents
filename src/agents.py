@@ -7,6 +7,7 @@ import json
 import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
+from starlette.responses import StreamingResponse
 
 load_dotenv()
 
@@ -20,7 +21,8 @@ if api_key:
         model_provider="azure_openai", 
         api_key=api_key, 
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"), 
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION")
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        streaming=True,
     )
 else:
     print("Using GitHub Inference")
@@ -29,7 +31,8 @@ else:
         model_provider="openai", 
         temperature=0.7, 
         api_key=os.getenv("GITHUB_TOKEN"), 
-        base_url="https://models.inference.ai.azure.com"
+        base_url="https://models.inference.ai.azure.com",
+        streaming=True,
     )
 
 # Create FastAPI app
@@ -40,33 +43,33 @@ async def writer_agent(request: Request):
     """
     Writer agent that generates text based on the provided input.
     """
-    try:
-        # Parse the request body directly
-        data = await request.json()
-        
-        # Extract content from the messages
-        content = ""
-        if isinstance(data, dict) and "content" in data:
-            content = data["content"]
-        else:
-            # Try to convert the entire data to a string as fallback
-            content = str(data)
-        
-        # Create prompt for generating stories
-        prompt = f"""You are a creative story writer. Write a short, engaging story based on the following prompt.
-        Keep it under 300 words and make it interesting.
-        
-        Prompt: {content}
-        """
-        
-        # Get response from language model
-        response = await llm.ainvoke([{"role": "system", "content": prompt}])
-        content = response.content if hasattr(response, 'content') else str(response)
-        
-        return JSONResponse(content={"response": content})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
 
+    # Parse the request body directly
+    data = await request.json()
+    
+    # Extract content from the messages
+    content = ""
+    if isinstance(data, dict) and "content" in data:
+        content = data["content"]
+    else:
+        # Try to convert the entire data to a string as fallback
+        content = str(data)
+    
+    # Create prompt for generating stories
+    prompt = f"""You are a creative story writer. Write a short, engaging story based on the following prompt.
+    Keep it under 300 words and make it interesting.
+    
+    Prompt: {content}
+    """
+    
+    #response = await llm.ainvoke([{"role": "system", "content": prompt}])
+    
+    def completion_stream():
+        for chunk in llm.stream([{"role": "system", "content": prompt}]):
+            yield chunk.content if hasattr(chunk, 'content') else str(chunk)
+
+    return StreamingResponse(completion_stream(), media_type="text/plain")
+    
 @app.post("/editor_agent")
 async def editor_agent(request: Request):
     """
